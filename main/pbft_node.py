@@ -30,6 +30,8 @@ class Node:
 
         # 节点列表，包括节点ip，端口号，id，共享密钥等
         self.node_list = node_list
+        if node_list is None:
+            self.node_list = {}
 
         # 该节点上的状态及状态副本,分为稳定检查点，最新状态，若干个不稳定检查点
         # 状态包括：区块链状态，消息日志，视图编号，使用dict保存
@@ -69,6 +71,8 @@ class Node:
 
         # 合法的客户端列表，用dict以客户端id为关键字保存对应的客户端信息，包括ip与端口号
         self.client_list = client_list
+        if client_list is None:
+            self.client_list = {}
 
         # 节点配置
         self.config = self.node_list.get(str(self.node_id))
@@ -238,6 +242,7 @@ class Node:
         pass
 
 
+a = Node()
 
 
 
