@@ -3,6 +3,8 @@ from crypto_algorithm import *
 import communication
 import copy
 from heapq import *
+import threading
+import time
 
 
 class Request(enum.Enum):
@@ -24,7 +26,7 @@ class MessageHead(enum.Enum):
 
 class Node:
 
-    def __init__(self, view=0, node_id=0, node_list=None, checkpoint_base=50, seq_space=100, client_list=None):
+    def __init__(self, view=0, node_id=0, node_list=None, checkpoint_base=50, seq_space=100, client_list=None, timeout=5):
 
         # 节点id
         self.node_id = node_id
@@ -49,8 +51,18 @@ class Node:
         log["view_change"] = {}
         log["new_view"] = {}
         self.status_current = {"chain": [], "unblock_data": [], "op_to_execute": [], "log": log, "view": view}
-        self.status_stable_checkpoint = copy.deepcopy(self.status_current)
+        # 稳定检查点信息中为{checkpoint:(状态摘要，块链状态，检查点序号),proof:证明}
+        dstate = get_hash(str(self.status_current["chain"]))
+        self.status_stable_checkpoint = {"checkpoint": (dstate, copy.deepcopy(self.status_current.get("chain")), 0),
+                                         "proof": {}}
         self.status_checkpoint = []
+
+        # 是否处于视图更改阶段
+        self.view_changing = False
+        # 定时器，同时保存启动该定时器的请求摘要
+        self.timer_state = {"timer": None, "dreq": None}
+        # 定时器超时时间
+        self.timeout = timeout
 
         # 检查点的产生间隔
         self.checkpoint_base = checkpoint_base
@@ -82,24 +94,66 @@ class Node:
             self.node_list[str(self.node_id)] = self.config
         self.node_sum = len(self.node_list)
 
+    # 定时器超时后调用该函数，进行视图更改
+    # 视图更改信息格式为<view_change,v+1,s,C,P,i,sign_MAC>,v+1为下一个视图，n为稳定检查点序号
+    # C是稳定检查点的证明，P是P是一个包含了对于每一个i已准备的消息序号大于n的消息的Pm集合的集合。
+    # Pm集合中包括一个有效的预准备消息（不包含对应的客户端信息），2f个对应的来自不同备份的有效的准备信息。
+    # i是节点id
+    def change_view(self, view):
+        # 启动定时器时的视图与当前视图不一致，不进行操作
+        if view != self.status_current.get("view"):
+            return
+
+        # 定时器在当前视图中超时，执行视图更改
+        self.view_changing = True
+        n = self.status_stable_checkpoint.get("checkpoint")[2]
+        C = self.status_stable_checkpoint.get("proof")
+        v = self.status_current.get("view")
+        P = []
+        pre_prepare_msg_list = self.status_current.get("log").get("pre_prepare")
+        prepare_msg_list = self.status_current.get("log").get("prepare")
+        for i in pre_prepare_msg_list:
+            done = list(eval(i))
+            done.append("done")
+            if pre_prepare_msg_list[i][2] > n and prepare_msg_list.get(done) is True:
+                Pm = {"pre_prepare": pre_prepare_msg_list[i][:-1], "prepare": prepare_msg_list[i]}
+                P.append(Pm)
+
+        view_change_msg = [MessageHead.view_change.value, v+1, n, C, P, self.node_id]
+        msg_sign = []
+        for i in self.node_list:
+            msg_sign.append(sign(str(view_change_msg), self.node_list[i].get("key")))
+
+        view_change_msg.append(msg_sign)
+        # 发送
+        self.multicast(view_change_msg)
+        # 重置计时器
+        self.timer_state["timer"] = None
+        self.timer_state["dreq"] = None
+
+
     def read(self, request):
         return request
 
     def write(self, request):
         return request
 
-    def multicast(self, message):
+    def multicast(self, message, send_to_self=True):
         for i in self.node_list:
-            communication.send(msg=message, **self.node_list[i])
+            if i != str(self.node_id):
+                communication.send(msg=message, **self.node_list[i])
+        # 是否发送给自身
+        if send_to_self:
+            communication.send(msg=message, **self.node_list[str(self.node_id)])
 
     def chose_handler(self, message):
-        if message[0] is MessageHead.request.value:
+        if message[0] is MessageHead.request.value and not self.view_changing:
             self.get_request(message)
-        elif message[0] is MessageHead.pre_prepare.value:
+        elif message[0] is MessageHead.pre_prepare.value and not self.view_changing:
             self.get_pre_prepare(message)
-        elif message[0] is MessageHead.prepare.value:
+        elif message[0] is MessageHead.prepare.value and not self.view_changing:
             self.get_prepare(message)
-        elif message[0] is MessageHead.commit.value:
+        elif message[0] is MessageHead.commit.value and not self.view_changing:
             self.get_commit(message)
         elif message[0] is MessageHead.checkpoint.value:
             self.get_checkpoint(message)
@@ -127,7 +181,8 @@ class Node:
                 return
         else:
             # 请求未被执行，根据当前节点是否为主节点采取相应操作
-            if self.node_id == (self.status_current["view"] % self.node_sum):
+            view = self.status_current["view"]
+            if self.node_id == (view % self.node_sum):
                 # 是主节点
                 # 当前处理的请求已达最大值，缓存该消息以后处理
                 # 预计将在生成检查点之后进行处理
@@ -139,14 +194,22 @@ class Node:
                     pre_prepare_msg = self.send_pre_prepare(request_msg=message, seq_number=self.seq)
                     # 将该预准备消息写入消息日志
                     pre_prepare_msg_dict = self.status_current["log"]["pre_prepare"]
-                    pre_prepare_msg_dict[str([self.status_current.get("view"), self.seq])] = pre_prepare_msg
+                    pre_prepare_msg_dict[str([view, self.seq])] = pre_prepare_msg
 
             else:
                 # 是备份节点，将请求转发至主节点
                 p = self.status_current["view"] % self.node_sum
                 communication.send(msg=message, **self.node_list[str(p)])
                 # 之后启动计时器，以及可能进行的视图更改
-                pass
+                # 若已有启动的计时器，则不再将进行其他操作
+                if self.timer_state["timer"] is not None:
+                    return
+                else:
+                    timer = threading.Timer(float(self.timeout), self.change_view, [view])
+                    self.timer_state["timer"] = timer
+                    timer.start()
+                    self.timer_state["dreq"] = message_hash
+
 
     def compare_timestamp(self, time_a, time_b):
         if time_a < time_b:
@@ -288,7 +351,9 @@ class Node:
 
         if commit_local > (self.node_sum*2)/3:
             # 已完成提交，将请求加入等待执行的堆
-            heappush(self.status_current.get("op_to_execute"), (n, pre_prepare_log_for_message[5]))
+            self.status_current.get("log").get("commit")[(str([v, n, "done"]))] = True
+            if pre_prepare_log_for_message[5] is not "":
+                heappush(self.status_current.get("op_to_execute"), (n, pre_prepare_log_for_message[5]))
 
     def check_message(self, message):
         # 检查
@@ -316,10 +381,13 @@ class Node:
 
         return True
 
-    def write_to_log(self, message, msg_type):
-        v = message[1]
-        n = message[2]
-        i = message[4]
+    def write_to_log(self, message, msg_type, v=None, n=None, i=None):
+        if v is None:
+            v = message[1]
+        if n is None:
+            n = message[2]
+        if i is None:
+            i = message[4]
         msg_log = self.status_current.get("log").get(msg_type)
         msg_log_for_v_n = msg_log.get(str([v, n]))
         msg_log_for_v_n_done = msg_log.get(str([v, n, "done"]))
@@ -345,27 +413,215 @@ class Node:
 
         # 检查是否以完成正确性证明
         checkpoint_msg_list = self.status_current.get("log").get("checkpoint").get(str([v, n]))
+        checkpoint_list = copy.deepcopy(self.status_checkpoint)
         for i in self.status_checkpoint:
+            if i[3] != n:
+                continue
             num = 0
             for j in checkpoint_msg_list:
                 if checkpoint_msg_list[j][3] == i[0]:
                     num += 1
             if num > (self.node_sum*2)/3:
-                # 完成正确性证明，该检查点成为稳定检查点
-                self.status_stable_checkpoint = i[1]
-                self.status_checkpoint.remove(i)
-                # 删除所有序号小于检查点的预准备，准备，提交消息
+                # 完成正确性证明，该检查点成为稳定检查点,保存该检查点信息以及正确性证明
+                checkpoint_proof = copy.deepcopy(checkpoint_msg_list)
+                stable_checkpoint = copy.deepcopy(i)
+                self.status_stable_checkpoint = {"checkpoint": stable_checkpoint, "proof": checkpoint_proof}
+                checkpoint_list.remove(i)
+                # 删除所有更早的检查点状态
+                for checkpoint in self.status_checkpoint:
+                    if checkpoint[2] <= i[2]:
+                        checkpoint_list.remove(checkpoint)
+                # 删除所有序号小于等于检查点的预准备，准备，提交消息
                 pre_prepare_list = self.status_current.get("log").get("pre_prepare")
                 for msg in pre_prepare_list:
                     if pre_prepare_list[msg][2] <= i[2]:
                         del pre_prepare_list[msg]
 
                 prepare_list = self.status_current.get("log").get("prepare")
+                for msg_list in prepare_list:
+                    if len(msg_list) > 0:
+                        if msg_list[0][2] <= i[2]:
+                            del msg_list
 
+                commit_list = self.status_current.get("log").get("commit")
+                for msg_list in commit_list:
+                    if len(msg_list) > 0:
+                        if msg_list[0][2] <= i[2]:
+                            del msg_list
+
+                # 更新序号有效范围
+                self.seq_min = n
+                self.seq_max = self.seq_min + self.checkpoint_base
+                # 对于主节点，为之前序号空间不够而缓存的消息生成预准备信息并发送
+                request_list_copy = copy.deepcopy(self.request_list)
+                for request_msg in self.request_list:
+                    # 序号空间不足，不做操作
+                    if self.seq + 1 > self.seq_max:
+                        pass
+                    # 当前仍有可分配的序号，为消息分配序号，发送预准备信息，将该请求从缓存中删除
+                    else:
+                        self.seq += 1
+                        pre_prepare_msg = self.send_pre_prepare(request_msg=request_msg, seq_number=self.seq)
+                        # 将该预准备消息写入消息日志
+                        pre_prepare_msg_dict = self.status_current["log"]["pre_prepare"]
+                        pre_prepare_msg_dict[str([self.status_current.get("view"), self.seq])] = pre_prepare_msg
+                        request_list_copy.remove(request_msg)
+                self.request_list = request_list_copy
+
+        self.status_checkpoint = checkpoint_list
+
+    # 视图更改信息格式为<view_change,v+1,n,C,P,i,sign_MAC>,v+1为下一个视图，n为稳定检查点的序号
+    # C是稳定检查点的证明，P是P是一个包含了对于每一个i已准备的消息序号大于n的消息的Pm集合的集合。
+    # Pm集合中包括一个有效的预准备消息（不包含对应的客户端信息），2f个对应的来自不同备份的有效的准备信息。
+    # i是节点id
+    def get_view_change(self, message):
+        # 首先检查这个视图更改信息要转到的视图中，自己是否是主节点，不是就不干事
+        if message[1] % self.node_sum != self.node_id:
+            return
+
+        else:
+            # 否则检查该消息是否有效
+            # 先检查该消息的签名
+            i = message[5]
+            C = message[3]
+            v = message[1]
+            # 不同节点所发送的稳定检查点可能不一致，因此n不应作为索引，将n同一设为0
+            n = 0
+            i_config = self.node_list.get(str(i))
+            if i_config is None:
+                return
+            else:
+                key = i_config.get("key")
+                message_to_sign = message[:6]
+                msg_sign = sign(str(message_to_sign), key=key)
+                if msg_sign != message[6][self.node_id]:
+                    return
+            # 检查是否有足够的证明
+            if len(C) <= (self.node_sum*2)/3:
+                return
+            # 通过证明后，写入消息日志
+            self.write_to_log(message=message, msg_type="view_change", v=v, n=n, i=i)
+            # 检查是否已经收到足够的视图更改信息
+            view_change_list = self.status_current.get("log").get("view_change").get(str([v, n]))
+            if len(view_change_list) > (self.node_sum*2)/3:
+                # 已收到足够的视图更改信息，生成新视图信息并发送
+                new_view_msg = self.send_new_view(v)
 
         pass
 
-    def get_view_change(self, message):
+    # 生成新视图信息并发送，生成的新视图信息被写入消息日志
+    # 新视图信息格式为<new_view,v+1,V,O>,其中，
+    # V为节点(v+1 mod r)所收到的视图更改信息的集合，
+    # O是预准备信息的集合（不包含请求本身），通过如下过程生成
+    # 主节点在集合V中选取最新的稳定检查点，取其序号作为最小序号min-s，max-s，并取v中的准备信息中最大的序号作为序号最大值。
+    # 主节点为新视图v+1中的每一个大于min-s小于max-s的序号n生成一条新的预准备信息，这里有两种情况：
+    # 在某些视图更改信息中的P中，至少存在一个集合拥有一个序号n，
+    #   在该情况，主节点产生一条新的信息<pre-prepare,v+1,n,d>xp，
+    #   其中d是V中具有最高视图编号的视图更改信息中的预准备信息中的请求的摘要。
+    # 没有上述集合，
+    #   在该情况下，主节点创建一条新的预准备信息<pre-prepare,v+1,n,dnull>xp，其中dnull是对于特殊的空操作的摘要。
+    def send_new_view(self, v):
+        # 先生成V
+        n = 0
+        V = self.status_current.get("log").get("view_change").get(str([v, n]))
+        # 生成O
+        # 选取最新的稳定检查点
+        checkpoint = self.status_stable_checkpoint.get("checkpoint")
+        msg_i = "0"
+        # 生成min-s
+        min_s = 0
+        for i in V:
+            # 稳定检查点信息中为{checkpoint:(状态摘要，块链状态，检查点序号),proof:证明}
+            if min_s <= V[i][2]:
+                min_s = V[i][2]
+                msg_i = i
+
+        # 生成max-s
+        max_s = min_s
+        for view_change_msg in V:
+            P = V[view_change_msg][4]
+            for Pm in P:
+                if max_s < Pm["pre_prepare"][2]:
+                    max_s = Pm["pre_prepare"][2]
+
+        # 两种情况
+        # 1.有一些消息需要重新执行三相协议
+        new_pre_prepare_msg_list = []
+        for n in range(min_s+1, max_s+1):
+            found = False
+            for view_change_msg in V:
+                P = V[view_change_msg][4]
+                for Pm in P:
+                    # 两种情况
+                    # 1.有一些消息需要重新执行三相协议
+                    if Pm["pre_prepare"][2] == n:
+                        found = True
+                        new_message = Pm["pre_prepare"][:-1]
+                        new_message[1] = v
+                        msg_sign = []
+                        for i in self.node_list:
+                            msg_sign.append(sign(str(new_message), self.node_list[i].get("key")))
+                        new_message.append(msg_sign)
+                        new_message.append("")
+                        new_pre_prepare_msg_list.append(new_message)
+                        break
+                if found:
+                    break
+            if not found:
+                # 2.没有这样的消息，生成空操作替代
+                new_message = [MessageHead.pre_prepare.value, self.status_current["view"], n,
+                               get_hash(str(Request.empty.value))]
+                # 进行签名，这里用MAC
+                msg_sign = []
+                for i in self.node_list:
+                    msg_sign.append(sign(str(new_message), self.node_list[i].get("key")))
+                new_message.append(msg_sign)
+                new_pre_prepare_msg_list.append(new_message)
+        O = new_pre_prepare_msg_list
+
+        for msg in O:
+            self.write_to_log(msg, "pre_prepare")
+        # 生成O之后的操作
+        if min_s > checkpoint[2]:
+            # 如果该稳定检查点序号比当前的自己的稳定检查点序号更新，首先检查未稳定的检查点是否是该序号
+            checkpoint_list = copy.deepcopy(self.status_checkpoint)
+            for unstable_checkpoint in self.status_checkpoint:
+                # 如果该检查点已在未稳定检查点中,将该检查点转变为稳定检查点
+                if unstable_checkpoint[2] == min_s:
+                    self.status_stable_checkpoint = {"checkpoint": unstable_checkpoint, "proof": V[msg_i][3]}
+                    checkpoint_list.remove(unstable_checkpoint)
+                    # 删除所有更早的检查点状态
+                    for checkpoint in self.status_checkpoint:
+                        if checkpoint[2] <= min_s:
+                            checkpoint_list.remove(checkpoint)
+                    # 删除所有序号小于等于检查点的预准备，准备，提交消息
+                    pre_prepare_list = self.status_current.get("log").get("pre_prepare")
+                    for msg in pre_prepare_list:
+                        if pre_prepare_list[msg][2] <= min_s:
+                            del pre_prepare_list[msg]
+
+                    prepare_list = self.status_current.get("log").get("prepare")
+                    for msg_list in prepare_list:
+                        if len(msg_list) > 0:
+                            if msg_list[0][2] <= min_s:
+                                del msg_list
+
+                    commit_list = self.status_current.get("log").get("commit")
+                    for msg_list in commit_list:
+                        if len(msg_list) > 0:
+                            if msg_list[0][2] <= min_s:
+                                del msg_list
+
+                    # 更新序号有效范围
+                    self.seq_min = min_s
+                    self.seq_max = self.seq_min + self.checkpoint_base
+                    # 更新视图v
+                    self.status_current["view"] = v
+
+            self.status_checkpoint = checkpoint_list
+        pass
+
+    def ask_for_checkpoint(self, node_id):
         pass
 
     def get_new_view(self, message):
@@ -375,6 +631,15 @@ class Node:
         op_list = self.status_current.get("op_to_execute")
         op = heappop(op_list)
         op_msg = op[1]
+
+        # 如果有对于该请求的计时器，则停止计时
+        dreq = get_hash(str(op_msg))
+        if self.timer_state["dreq"] == dreq and self.timer_state["timer"] is not None:
+            self.timer_state["timer"].cancel()
+            self.timer_state["dreq"] = None
+            self.timer_state["timer"] = None
+
+        result = ""
         if op_msg[2] == Request.read.value:
             result = self.read(op_msg)
         elif op_msg[2] == Request.write.value:
@@ -395,7 +660,8 @@ class Node:
             # 到达检查点，将区块打包,写入区块链
             self.generate_block()
             # 生成检查点信息
-            state_to_hash = str(self.status_current)
+            # 当前服务状态为chain的状态
+            state_to_hash = str(self.status_current.get("chain"))
             dstate = get_hash(state_to_hash)
             checkpoint_msg = [MessageHead.checkpoint.value, self.status_current.get("view"), op[0], dstate,
                               self.node_id]
@@ -405,26 +671,11 @@ class Node:
 
             checkpoint_msg.append(msg_sign)
             # 广播检查点信息
-            self.multicast(checkpoint_msg)
+            self.multicast(checkpoint_msg, send_to_self=True)
             # 将该检查点移入检查点列表
-            checkpoint = copy.deepcopy(self.status_current)
+            # 检查点即为服务状态，也即区块链状态
+            checkpoint = copy.deepcopy(self.status_current.get("chain"))
             self.status_checkpoint.append((dstate, checkpoint, op[0]))
-            # 进入下一个检查点阶段，更新序号有效范围
-            self.seq_min = op[0]
-            self.seq_max = self.seq_min + self.checkpoint_base
-            # 对于主节点，为之前序号空间不够而缓存的消息生成预准备信息并发送
-            for i in self.request_list:
-                # 序号空间不足，不做操作
-                if self.seq+1 > self.seq_max:
-                    pass
-                # 当前仍有可分配的序号，为消息分配序号，发送预准备信息，将该请求从缓存中删除
-                else:
-                    self.seq += 1
-                    pre_prepare_msg = self.send_pre_prepare(request_msg=message, seq_number=self.seq)
-                    # 将该预准备消息写入消息日志
-                    pre_prepare_msg_dict = self.status_current["log"]["pre_prepare"]
-                    pre_prepare_msg_dict[str([self.status_current.get("view"), self.seq])] = pre_prepare_msg
-                    self.request_list.remove(i)
 
     def generate_block(self):
         pass

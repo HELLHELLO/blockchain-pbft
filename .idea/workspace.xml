@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="3d7c51eb-e4aa-45e5-a4f8-e3834939c53e" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/test/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main/pbft_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/main/pbft_node.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -12,6 +14,7 @@
   </component>
   <component name="CoverageDataManager">
     <SUITE FILE_PATH="coverage/myblockchain$pbft_node.coverage" NAME="pbft_node Coverage Results" MODIFIED="1552553439142" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/main" />
+    <SUITE FILE_PATH="coverage/myblockchain$test.coverage" NAME="test Coverage Results" MODIFIED="1552637992272" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test" />
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
@@ -23,10 +26,34 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main/pbft_node.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="525">
-              <caret line="362" column="76" selection-start-line="362" selection-start-column="76" selection-end-line="362" selection-end-column="76" />
+            <state relative-caret-position="4177">
+              <caret line="581" column="10" lean-forward="true" selection-start-line="581" selection-start-column="10" selection-end-line="581" selection-end-column="10" />
               <folding>
                 <element signature="e#0#11#0" expanded="true" />
+                <element signature="e#2386#2400#0" />
+                <element signature="e#2440#2454#0" />
+                <element signature="e#2531#2751#0" />
+                <element signature="e#2635#3290#0" />
+                <element signature="e#3296#3356#0" />
+                <element signature="e#5063#5145#0" />
+                <element signature="e#5868#7585#0" />
+                <element signature="e#8076#9033#0" />
+                <element signature="e#10263#10911#0" />
+                <element signature="e#12750#12754#0" />
+                <element signature="e#15151#15155#0" />
+                <element signature="e#15194#15202#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/test.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="462">
+              <caret line="21" column="21" lean-forward="true" selection-start-line="21" selection-start-column="21" selection-end-line="21" selection-end-column="21" />
+              <folding>
+                <element signature="e#0#16#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -68,6 +95,7 @@
         <option value="$PROJECT_DIR$/pbft_node.py" />
         <option value="$PROJECT_DIR$/main/crypto_algorithm.py" />
         <option value="$PROJECT_DIR$/main/communication.py" />
+        <option value="$PROJECT_DIR$/test/test.py" />
         <option value="$PROJECT_DIR$/main/pbft_node.py" />
       </list>
     </option>
@@ -83,6 +111,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -103,12 +132,11 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/main/pbft_node.py" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/test/test.py" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="settings.editor.selected.configurable" value="PyConsoleConfigurable.Python Console" />
@@ -138,7 +166,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.test">
     <configuration name="pbft_node" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
       <module name="myblockchain" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -161,6 +189,32 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="test" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="myblockchain" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="C:\Users\wzq\AppData\Local\Programs\Python\Python37\python.exe" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/test.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Python.pbft_node" />
+      <item itemvalue="Python.test" />
+    </list>
   </component>
   <component name="SvnConfiguration">
     <configuration />
@@ -175,16 +229,17 @@
       <workItem from="1552455458950" duration="16186000" />
       <workItem from="1552471803339" duration="253000" />
       <workItem from="1552538640726" duration="16349000" />
+      <workItem from="1552628198912" duration="17094000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="32788000" />
+    <option name="totallyTimeSpent" value="49882000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.25746268" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.26012793" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -211,23 +266,6 @@
     <option name="version" value="1" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/../blockchain/first_blockchain/blockchain-IoT-PoC/blockchain/blockchain.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/main/crypto_algorithm.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="242">
-          <caret line="11" selection-start-line="11" selection-end-line="11" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/main/communication.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="22">
-          <caret line="1" selection-start-line="1" selection-end-line="1" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/AppData/Local/Programs/Python/Python37/Lib/types.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1760">
@@ -242,12 +280,51 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/../blockchain/first_blockchain/blockchain-IoT-PoC/blockchain/blockchain.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main/communication.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="22">
+          <caret line="1" selection-start-line="1" selection-end-line="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main/crypto_algorithm.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="242">
+          <caret line="11" selection-start-line="11" selection-end-line="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/test.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="462">
+          <caret line="21" column="21" lean-forward="true" selection-start-line="21" selection-start-column="21" selection-end-line="21" selection-end-column="21" />
+          <folding>
+            <element signature="e#0#16#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/main/pbft_node.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="525">
-          <caret line="362" column="76" selection-start-line="362" selection-start-column="76" selection-end-line="362" selection-end-column="76" />
+        <state relative-caret-position="4177">
+          <caret line="581" column="10" lean-forward="true" selection-start-line="581" selection-start-column="10" selection-end-line="581" selection-end-column="10" />
           <folding>
             <element signature="e#0#11#0" expanded="true" />
+            <element signature="e#2386#2400#0" />
+            <element signature="e#2440#2454#0" />
+            <element signature="e#2531#2751#0" />
+            <element signature="e#2635#3290#0" />
+            <element signature="e#3296#3356#0" />
+            <element signature="e#5063#5145#0" />
+            <element signature="e#5868#7585#0" />
+            <element signature="e#8076#9033#0" />
+            <element signature="e#10263#10911#0" />
+            <element signature="e#12750#12754#0" />
+            <element signature="e#15151#15155#0" />
+            <element signature="e#15194#15202#0" />
           </folding>
         </state>
       </provider>
