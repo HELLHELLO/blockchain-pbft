@@ -2,8 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="3d7c51eb-e4aa-45e5-a4f8-e3834939c53e" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/test/test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main/pbft_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/main/pbft_node.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -14,7 +12,7 @@
   </component>
   <component name="CoverageDataManager">
     <SUITE FILE_PATH="coverage/myblockchain$pbft_node.coverage" NAME="pbft_node Coverage Results" MODIFIED="1552553439142" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/main" />
-    <SUITE FILE_PATH="coverage/myblockchain$test.coverage" NAME="test Coverage Results" MODIFIED="1552637992272" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test" />
+    <SUITE FILE_PATH="coverage/myblockchain$test.coverage" NAME="test Coverage Results" MODIFIED="1552817156107" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test" />
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
@@ -26,22 +24,32 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main/pbft_node.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4177">
-              <caret line="581" column="10" lean-forward="true" selection-start-line="581" selection-start-column="10" selection-end-line="581" selection-end-column="10" />
+            <state relative-caret-position="432">
+              <caret line="794" lean-forward="true" selection-start-line="794" selection-end-line="794" />
               <folding>
                 <element signature="e#0#11#0" expanded="true" />
-                <element signature="e#2386#2400#0" />
-                <element signature="e#2440#2454#0" />
-                <element signature="e#2531#2751#0" />
-                <element signature="e#2635#3290#0" />
-                <element signature="e#3296#3356#0" />
-                <element signature="e#5063#5145#0" />
-                <element signature="e#5868#7585#0" />
-                <element signature="e#8076#9033#0" />
-                <element signature="e#10263#10911#0" />
-                <element signature="e#12750#12754#0" />
-                <element signature="e#15151#15155#0" />
-                <element signature="e#15194#15202#0" />
+                <element signature="e#510#2796#0" />
+                <element signature="e#2802#2822#0" />
+                <element signature="e#3062#4344#0" />
+                <element signature="e#4462#4718#0" />
+                <element signature="e#4766#5529#0" />
+                <element signature="e#5661#7604#0" />
+                <element signature="e#7664#7746#0" />
+                <element signature="e#7842#8245#0" />
+                <element signature="e#8469#10186#0" />
+                <element signature="e#10274#10558#0" />
+                <element signature="e#10677#11634#0" />
+                <element signature="e#11751#12964#0" />
+                <element signature="e#13012#13660#0" />
+                <element signature="e#13741#14310#0" />
+                <element signature="e#14485#18473#0" />
+                <element signature="e#19457#21433#0" />
+                <element signature="e#18923#18951#0" />
+                <element signature="e#20431#21280#0" />
+                <element signature="e#21317#23774#0" />
+                <element signature="e#23826#25996#0" />
+                <element signature="e#25956#27061#0" />
+                <element signature="e#27061#29120#0" />
               </folding>
             </state>
           </provider>
@@ -50,8 +58,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/test/test.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="462">
-              <caret line="21" column="21" lean-forward="true" selection-start-line="21" selection-start-column="21" selection-end-line="21" selection-end-column="21" />
+            <state relative-caret-position="440">
+              <caret line="21" column="21" selection-start-line="21" selection-start-column="21" selection-end-line="21" selection-end-column="21" />
               <folding>
                 <element signature="e#0#16#0" expanded="true" />
               </folding>
@@ -230,16 +238,17 @@
       <workItem from="1552471803339" duration="253000" />
       <workItem from="1552538640726" duration="16349000" />
       <workItem from="1552628198912" duration="17094000" />
+      <workItem from="1552805831098" duration="11327000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="49882000" />
+    <option name="totallyTimeSpent" value="61209000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.26012793" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.26279318" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -283,6 +292,16 @@
     <entry file="file://$PROJECT_DIR$/../blockchain/first_blockchain/blockchain-IoT-PoC/blockchain/blockchain.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
+    <entry file="file://$PROJECT_DIR$/test/test.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="440">
+          <caret line="21" column="21" selection-start-line="21" selection-start-column="21" selection-end-line="21" selection-end-column="21" />
+          <folding>
+            <element signature="e#0#16#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/main/communication.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="22">
@@ -297,34 +316,34 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/test/test.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="462">
-          <caret line="21" column="21" lean-forward="true" selection-start-line="21" selection-start-column="21" selection-end-line="21" selection-end-column="21" />
-          <folding>
-            <element signature="e#0#16#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/main/pbft_node.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4177">
-          <caret line="581" column="10" lean-forward="true" selection-start-line="581" selection-start-column="10" selection-end-line="581" selection-end-column="10" />
+        <state relative-caret-position="432">
+          <caret line="794" lean-forward="true" selection-start-line="794" selection-end-line="794" />
           <folding>
             <element signature="e#0#11#0" expanded="true" />
-            <element signature="e#2386#2400#0" />
-            <element signature="e#2440#2454#0" />
-            <element signature="e#2531#2751#0" />
-            <element signature="e#2635#3290#0" />
-            <element signature="e#3296#3356#0" />
-            <element signature="e#5063#5145#0" />
-            <element signature="e#5868#7585#0" />
-            <element signature="e#8076#9033#0" />
-            <element signature="e#10263#10911#0" />
-            <element signature="e#12750#12754#0" />
-            <element signature="e#15151#15155#0" />
-            <element signature="e#15194#15202#0" />
+            <element signature="e#510#2796#0" />
+            <element signature="e#2802#2822#0" />
+            <element signature="e#3062#4344#0" />
+            <element signature="e#4462#4718#0" />
+            <element signature="e#4766#5529#0" />
+            <element signature="e#5661#7604#0" />
+            <element signature="e#7664#7746#0" />
+            <element signature="e#7842#8245#0" />
+            <element signature="e#8469#10186#0" />
+            <element signature="e#10274#10558#0" />
+            <element signature="e#10677#11634#0" />
+            <element signature="e#11751#12964#0" />
+            <element signature="e#13012#13660#0" />
+            <element signature="e#13741#14310#0" />
+            <element signature="e#14485#18473#0" />
+            <element signature="e#19457#21433#0" />
+            <element signature="e#18923#18951#0" />
+            <element signature="e#20431#21280#0" />
+            <element signature="e#21317#23774#0" />
+            <element signature="e#23826#25996#0" />
+            <element signature="e#25956#27061#0" />
+            <element signature="e#27061#29120#0" />
           </folding>
         </state>
       </provider>
