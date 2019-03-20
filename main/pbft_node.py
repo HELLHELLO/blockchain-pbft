@@ -27,7 +27,8 @@ class MessageHead(enum.Enum):
 
 class Node:
 
-    def __init__(self, view=0, node_id=0, node_list=None, checkpoint_base=50, seq_space=100, client_list=None, timeout=1
+    def __init__(self, view=0, node_id=0, node_list=None, checkpoint_base=50, seq_space=100, client_list=None,
+                 timeout=1
                  ):
 
         # 节点id
@@ -86,6 +87,9 @@ class Node:
         # 以这种方式来保存：{request的hash值：reply的内容}以及{c:reply}，当发现收到的request的hash值在该dict中有对应的value时，直接取出对应的value作为reply
         self.latest_reply = {}
 
+        # 保存已收到的请求，防止收到重复请求
+        self.request_have_receive = {}
+
         # 正在处理的消息数达到最大值时，多余的请求被缓存
         self.request_list = []
 
@@ -116,9 +120,21 @@ class Node:
 
         # 定时器在当前视图中超时，执行视图更改
         self.view_changing = True
+        view_change_msg = self.generate_view_change(v=self.status_current["next_view"])
+        # 发送
+        self.multicast(view_change_msg)
+        # 自身视图+1
+        self.status_current["next_view"] += 1
+        # 重置计时器
+        self.timer_state["timer"] = None
+        self.timer_state["dreq"] = None
+
+        if self.node_id == 1:
+            print("send view change from 1")
+
+    def generate_view_change(self,v):
         n = self.status_stable_checkpoint.get("checkpoint")[2]
-        C = self.status_stable_checkpoint.get("proof")
-        v = self.status_current.get("next_view")
+        C = copy.deepcopy(self.status_stable_checkpoint.get("proof"))
         P = []
         pre_prepare_msg_list = self.status_current.get("log").get("pre_prepare")
         prepare_msg_list = self.status_current.get("log").get("prepare")
@@ -136,23 +152,32 @@ class Node:
             msg_sign.append(sign(str(view_change_msg), self.node_list[i].get("key")))
 
         view_change_msg.append(msg_sign)
-        # 发送
-        self.multicast(view_change_msg)
-        # 自身视图+1
-        self.status_current["next_view"] += 1
-        # 重置计时器
-        self.timer_state["timer"] = None
-        self.timer_state["dreq"] = None
+        return view_change_msg
 
-        if self.node_id == 1:
-            print("send view change from 1")
-
+    # 读取时，request中最后应该带上一个元组（bn,n），其中bn为块号，n为块中条号
     def read(self, request):
-        return request
+        bn, n = request[-1]
+        #result = None
+        if bn > len(self.status_current["chain"]):
+            result = None
+        elif bn == len(self.status_current["chain"]):
+            try:
+                result = self.status_current["unblock_data"][n]
+            except Exception:
+                result = None
+        else:
+            try:
+                result = self.status_current["chain"][bn]["body"][n]
+            except Exception:
+                result = None
+        return result
 
+    # 写入时，request最后的参数为字符串,返回（bn，n）
     def write(self, request):
-        self.status_current["unblock_data"].append(request)
-        return request
+        n = len(self.status_current["unblock_data"])
+        bn = len(self.status_current["chain"])
+        self.status_current["unblock_data"].append(request[-1])
+        return str((bn, n))
 
     def multicast(self, message, send_to_self=True):
         for i in self.node_list:
@@ -204,6 +229,12 @@ class Node:
         message_hash = get_hash(str(message))
         if self.latest_reply.get(message_hash) is not None:
             communication.send(msg=self.latest_reply[message_hash], **self.client_list[message[3]])
+            self.multicast(message)
+            return
+        # 检查该请求是否已收到过
+        if self.request_have_receive.get(message_hash) is not None:
+            return
+        self.request_have_receive[message_hash] = True
         # 检查该请求的时间戳是否早于最后一次对该客户端回复的时间戳
         if self.latest_reply.get(str(message[3])) is not None:
             if self.compare_timestamp(message[1], self.latest_reply.get(str(message[3]))[2]):
@@ -255,7 +286,7 @@ class Node:
     # 生成预准备信息并发送，生成的预准备信息被返回
     def send_pre_prepare(self, request_msg, seq_number, view):
         if self.node_id == 1:
-            print("send_pre_prepare", view,",",seq_number, "from 0", )
+            print("send_pre_prepare", view,",",seq_number, "from", self.node_id )
         message = [MessageHead.pre_prepare.value, view, seq_number, get_hash(str(request_msg))]
         # 进行签名，这里用MAC
         msg_sign = []
@@ -486,10 +517,12 @@ class Node:
         else:
             # 将检查点消息写入消息日志
             self.write_to_log(message, "checkpoint")
+            if self.node_id == 1:
+                print("receive checkpoint from", message[4])
 
         # 检查是否以完成正确性证明
         checkpoint_msg_list = self.status_current.get("log").get("checkpoint").get(str([v, n]))
-        checkpoint_list = copy.deepcopy(self.status_checkpoint)
+        checkpoint_to_del = []
         for i in self.status_checkpoint:
             if i[2] != n:
                 continue
@@ -502,11 +535,11 @@ class Node:
                 checkpoint_proof = copy.deepcopy(checkpoint_msg_list)
                 stable_checkpoint = copy.deepcopy(i)
                 self.status_stable_checkpoint = {"checkpoint": stable_checkpoint, "proof": checkpoint_proof}
-                checkpoint_list.remove(i)
+                checkpoint_to_del.append(i)
                 # 删除所有更早的检查点状态
                 for checkpoint in self.status_checkpoint:
-                    if checkpoint[2] <= i[2]:
-                        checkpoint_list.remove(checkpoint)
+                    if checkpoint[2] < i[2]:
+                        checkpoint_to_del.append(checkpoint)
                 # 删除所有序号小于等于检查点的预准备，准备，提交消息,新视图信息,视图更改信息
                 pre_prepare_list = self.status_current.get("log").get("pre_prepare")
                 keys = list(pre_prepare_list.keys())
@@ -519,7 +552,8 @@ class Node:
                 for msg_list in keys:
                     if prepare_list[msg_list] is not True and prepare_list[msg_list] is not False and \
                             len(prepare_list[msg_list]) > 0:
-                        if prepare_list[msg_list][0][2] <= i[2]:
+                        if list(prepare_list[msg_list].values())[0][2]:
+                            # prepare_list[msg_list][0][2] <= i[2]:
                             prepare_list.pop(msg_list)
 
                 commit_list = self.status_current.get("log").get("commit")
@@ -527,27 +561,36 @@ class Node:
                 for msg_list in keys:
                     if commit_list[msg_list] is not True and commit_list[msg_list] is not False and \
                             len(commit_list[msg_list]) > 0:
-                        if commit_list[msg_list][0][2] <= i[2]:
+                        if list(commit_list[msg_list].values())[0][2]:
                             commit_list.pop(msg_list)
 
                 new_view_list = self.status_current.get("log").get("new_view")
                 keys = list(new_view_list.keys())
                 for new_view in keys:
-                    v, view_n = list(eval(new_view))
+                    view_n = list(eval(new_view))[1]
                     if view_n < i[2]:
                         new_view_list.pop(new_view)
 
                 view_change_list = self.status_current.get("log").get("view_change")
                 keys = list(view_change_list.keys())
                 for view_change in keys:
-                    v, change_n = list(eval(view_change))
+                    v = list(eval(view_change))[0]
                     if v < view:
                         view_change_list.pop(view_change)
+
+                checkpoint_msg_dict = self.status_current.get("log").get("checkpoint")
+                keys = list(checkpoint_msg_dict.keys())
+                for key in keys:
+                    if checkpoint_msg_dict[key] is not False and \
+                            checkpoint_msg_dict[key] is not True and \
+                            len(checkpoint_msg_dict[key]) > 0:
+                        if list(checkpoint_msg_dict[key].values())[0][2] < n:
+                            checkpoint_msg_dict.pop(key)
 
                 # 更新序号有效范围
                 self.seq_lock.acquire()
                 self.seq_min = n
-                self.seq_max = self.seq_min + self.checkpoint_base
+                self.seq_max = self.seq_min + self.seq_space
                 # 对于主节点，为之前序号空间不够而缓存的消息生成预准备信息并发送
                 # request_list_copy = copy.deepcopy(self.request_list)
                 wait_for_del = []
@@ -570,15 +613,17 @@ class Node:
                 for request_msg in wait_for_del:
                     self.request_list.remove(request_msg)
                 break
-        self.status_checkpoint = checkpoint_list
+        for i in checkpoint_to_del:
+            self.status_checkpoint.remove(i)
+        #self.status_checkpoint = checkpoint_list
 
         # 删除之前的检查点信息
-        checkpoint_msg_list = self.status_current.get("log").get("checkpoint")
-        keys = list(checkpoint_msg_list.keys())
-        for key in keys:
-            if len(checkpoint_msg_list[key]) > 0:
-                if checkpoint_msg_list[key][0][2] < n:
-                    checkpoint_msg_list.pop(key)
+        #checkpoint_msg_list = self.status_current.get("log").get("checkpoint")
+        #keys = list(checkpoint_msg_list.keys())
+        #for key in keys:
+        #    if len(checkpoint_msg_list[key]) > 0:
+        #        if list(checkpoint_msg_list[key].values())[0][2] < n:
+        #            checkpoint_msg_list.pop(key)
 
     # 视图更改信息格式为<view_change,v+1,n,C,P,i,sign_MAC>,v+1为下一个视图，n为稳定检查点的序号
     # C是稳定检查点的证明，P是P是一个包含了对于每一个i已准备的消息序号大于n的消息的Pm集合的集合。
@@ -666,9 +711,12 @@ class Node:
     # 没有上述集合，
     #   在该情况下，主节点创建一条新的预准备信息<pre-prepare,v+1,n,dnull>xp，其中dnull是对于特殊的空操作的摘要。
     def send_new_view(self, v):
+        # 将自身生成的view_change写入日志先
+        view_change_msg = self.generate_view_change(v=v)
+        self.write_to_log(view_change_msg,msg_type="view_change",v=view_change_msg[1],n=0,i=self.node_id)
         # 先生成V
         n = 0
-        V = self.status_current.get("log").get("view_change").get(str([v, n]))
+        V = copy.deepcopy(self.status_current.get("log").get("view_change").get(str([v, n])))
         if self.node_id == 1:
             print("V", V)
         # 生成O
@@ -677,7 +725,7 @@ class Node:
             print("goto generate O")
         O, min_s, msg_i, max_s = self.generate_O(V, v)
         if self.node_id == 1:
-            print("O has been generate")
+            print("O has been generate,max_s=",max_s)
         for msg in O:
             self.write_to_log(msg, "pre_prepare")
         # 生成O之后的操作,更新自身的检查点
@@ -689,7 +737,7 @@ class Node:
         # 更新序号有效范围
         self.seq_lock.acquire()
         self.seq_min = min_s
-        self.seq_max = self.seq_min + self.checkpoint_base
+        self.seq_max = self.seq_min + self.seq_space
         self.seq = max_s + 1
         self.seq_lock.release()
         # 更新视图v
@@ -700,11 +748,15 @@ class Node:
         # 发送new_view信息
         new_view = [MessageHead.new_view.value, v, V, O]
         msg_sign = []
+        str_new_view = str(new_view)
+
         for i in self.node_list:
-            msg_sign.append(sign(str(new_view), self.node_list[i].get("key")))
+            msg_sign.append(sign(str_new_view, self.node_list[i].get("key")))
         new_view.append(msg_sign)
         if self.node_id == 1:
             print(len(str(new_view)))
+            #print("new_view:",new_view)
+            #print("str_new_view",str_new_view)
         self.multicast(message=new_view, send_to_self=True)
         return new_view, min_s
 
@@ -728,6 +780,10 @@ class Node:
             if found_checkpoint is False:
                 new_checkpoint = self.ask_for_checkpoint(msg_i)
                 self.status_stable_checkpoint = new_checkpoint
+                # 此时，应更新自身的chain，同时确保所有该检查点之后的操作都被执行
+                self.status_current["chain"] = new_checkpoint[1]
+                self.status_current["op_to_execute"] = []
+                self.latest_reply = {}
             # 删除所有更早的检查点状态
             for checkpoint in self.status_checkpoint:
                 if checkpoint[2] <= min_s:
@@ -742,21 +798,26 @@ class Node:
                 prepare_list = self.status_current.get("log").get("prepare")
                 keys = list(prepare_list.keys())
                 for msg_list in keys:
-                    if len(prepare_list[msg_list]) > 0:
-                        if prepare_list[msg_list][0][2] <= min_s:
+                    if prepare_list[msg_list] is not True and prepare_list[msg_list] is not False and \
+                            len(prepare_list[msg_list]) > 0:
+                        if list(prepare_list[msg_list].values())[0][2] <= min_s:
                             prepare_list.pop(msg_list)
 
                 commit_list = self.status_current.get("log").get("commit")
                 keys = list(commit_list.keys())
                 for msg_list in keys:
-                    if len(commit_list[msg_list]) > 0:
-                        if commit_list[msg_list][0][2] <= min_s:
+                    if commit_list[msg_list] is not True and commit_list[msg_list] is not False and \
+                            len(commit_list[msg_list]) > 0:
+                        if list(commit_list[msg_list].values())[0][2] <= min_s:
                             commit_list.pop(msg_list)
 
                 checkpoint_msg_list = self.status_current.get("log").get("checkpoint")
                 keys = list(checkpoint_msg_list.keys())
                 for key in keys:
-                    if checkpoint_msg_list[key][0][2] < min_s:
+                    if checkpoint_msg_list[key] is not False and \
+                            checkpoint_msg_list[key] is not True and \
+                            len(checkpoint_msg_list[key]) > 0:
+                    # if list(checkpoint_msg_list[key].values())[0][2] < min_s:
                         checkpoint_msg_list.pop(key)
             self.status_checkpoint = checkpoint_list
 
@@ -827,25 +888,39 @@ class Node:
         # 主节点编号
         p = v % self.node_sum
         to_sign = message[:-1]
+        if self.node_id == 1:
+            print("receive new view from", p)
         # 检查签名
         i_config = self.node_list.get(str(p))
         if i_config is None:
+            if self.node_id == 1:
+                print("no config")
             return
         else:
             key = i_config.get("key")
             msg_sign = sign(str(to_sign), key=key)
             if msg_sign != message[-1][self.node_id]:
+                if self.node_id == 1:
+                    print("wrong sign", p)
+                    print(msg_sign)
+                    print(message[-1][self.node_id])
                 return
 
         V = message[2]
-        if len(V) < (self.node_sum*2)/3:
+        if len(V) < math.floor(self.node_sum/3)*2:
+            if self.node_id == 1:
+                print("unenough V")
             return
 
         # 检查O是否正确
         O, min_s, msg_i, max_s = self.generate_O(V, v)
         if str(O) != str(message[3]):
+            if self.node_id == 1:
+                print("wrong O")
             return
         self.write_to_log(message=message, msg_type="new_view", v=v, n=min_s, i=p)
+        if self.node_id == 1:
+            print("receive value new view from", p)
         # 通过检测，将O中消息写入日志
         for msg in O:
             self.write_to_log(msg, "pre_prepare")
@@ -855,7 +930,7 @@ class Node:
         self.seq_lock.acquire()
         self.seq = max_s + 1
         self.seq_min = min_s
-        self.seq_max = self.seq_min + self.checkpoint_base
+        self.seq_max = self.seq_min + self.seq_space
         self.seq_lock.release()
         # 更新视图v
         self.status_current["view"] = v
@@ -897,7 +972,7 @@ class Node:
             elif op_msg[2] == Request.write.value:
                 result = self.write(op_msg)
             elif op_msg[2] == Request.empty.value:
-                result = ""
+                result = op_msg[-1]
             message = []
             message.append(MessageHead.reply.value)
             message.append(self.status_current.get("view"))
@@ -906,6 +981,8 @@ class Node:
             message.append(self.node_id)
             message.append(result)
             communication.send(msg=message, **self.client_list[op_msg[3]])
+            if self.request_have_receive.get(dreq) is not None:
+                self.request_have_receive.pop(dreq)
 
             # 检查是否到达检查点
             if op[0] % self.checkpoint_base == 0:
@@ -930,7 +1007,16 @@ class Node:
                 self.status_checkpoint.append((dstate, checkpoint, op[0]))
 
     def generate_block(self):
-        self.status_current["chain"].append(str(self.status_current["unblock_data"]))
+        index = len(self.status_current["chain"])
+        head = {"index": index,
+                "p_hash": get_hash(str(self.status_current["chain"][index-1])),
+                "hash": None,
+                "timestamp": self.get_timesatmp()
+              }
+        block = {"head": head, "body": self.status_current["unblock_data"]}
+        dblock = get_hash(str(block))
+        block["head"]["hash"] = dblock
+        self.status_current["chain"].append(block)
         self.status_current["unblock_data"] = []
         return
 
@@ -987,10 +1073,10 @@ if __name__=='__main__':
     d_list["3"]["key"] = "dd"
 
     client_list = {"2": {"ip": "127.0.0.1", "port": "60000"}}
-    a = Node(node_id=0, node_list=a_list, client_list=client_list, timeout=10)
-    b = Node(node_id=1, node_list=b_list, client_list=client_list, timeout=10)
-    c = Node(node_id=2, node_list=c_list, client_list=client_list, timeout=10)
-    d = Node(node_id=3, node_list=d_list, client_list=client_list, timeout=10)
+    a = Node(node_id=0, node_list=a_list, client_list=client_list, timeout=10, checkpoint_base=3)
+    b = Node(node_id=1, node_list=b_list, client_list=client_list, timeout=10, checkpoint_base=3)
+    c = Node(node_id=2, node_list=c_list, client_list=client_list, timeout=10, checkpoint_base=3)
+    d = Node(node_id=3, node_list=d_list, client_list=client_list, timeout=10, checkpoint_base=3)
     #a.start_node()
     b.start_node()
     c.start_node()
