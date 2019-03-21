@@ -1,4 +1,4 @@
-import enum
+from messgae_head import *
 from crypto_algorithm import *
 import communication
 import copy
@@ -7,22 +7,6 @@ import threading
 import time
 import socket
 import math
-
-class Request(enum.Enum):
-    empty = 0
-    read = 1
-    write = 2
-
-
-class MessageHead(enum.Enum):
-    request = 0
-    pre_prepare = 1
-    prepare = 2
-    commit = 3
-    reply = 4
-    checkpoint = 5
-    view_change = 6
-    new_view = 7
 
 
 class Node:
@@ -228,7 +212,7 @@ class Node:
         # 检查该请求是否已被执行
         message_hash = get_hash(str(message))
         if self.latest_reply.get(message_hash) is not None:
-            communication.send(msg=self.latest_reply[message_hash], **self.client_list[message[3]])
+            communication.send(msg=self.latest_reply[message_hash][-1], **self.client_list[message[3]])
             self.multicast(message)
             return
         # 检查该请求是否已收到过
@@ -552,7 +536,7 @@ class Node:
                 for msg_list in keys:
                     if prepare_list[msg_list] is not True and prepare_list[msg_list] is not False and \
                             len(prepare_list[msg_list]) > 0:
-                        if list(prepare_list[msg_list].values())[0][2]:
+                        if list(prepare_list[msg_list].values())[0][2] <= n:
                             # prepare_list[msg_list][0][2] <= i[2]:
                             prepare_list.pop(msg_list)
 
@@ -561,14 +545,14 @@ class Node:
                 for msg_list in keys:
                     if commit_list[msg_list] is not True and commit_list[msg_list] is not False and \
                             len(commit_list[msg_list]) > 0:
-                        if list(commit_list[msg_list].values())[0][2]:
+                        if list(commit_list[msg_list].values())[0][2] <= n:
                             commit_list.pop(msg_list)
 
                 new_view_list = self.status_current.get("log").get("new_view")
                 keys = list(new_view_list.keys())
                 for new_view in keys:
                     view_n = list(eval(new_view))[1]
-                    if view_n < i[2]:
+                    if view_n < n:
                         new_view_list.pop(new_view)
 
                 view_change_list = self.status_current.get("log").get("view_change")
@@ -586,6 +570,12 @@ class Node:
                             len(checkpoint_msg_dict[key]) > 0:
                         if list(checkpoint_msg_dict[key].values())[0][2] < n:
                             checkpoint_msg_dict.pop(key)
+
+                # 删除已保存的响应信息
+                keys = list(self.latest_reply.keys())
+                for key in keys:
+                    if self.latest_reply[key][0]< n:
+                        self.latest_reply.pop[key]
 
                 # 更新序号有效范围
                 self.seq_lock.acquire()
@@ -951,6 +941,7 @@ class Node:
                 #print(str(self.status_current["log"]))
             op = heappop(op_list)
             op_msg = op[1]
+            message_hash = get_hash(str(op_msg))
             request_t = op_msg[1]
             # 如果有对于该请求的计时器，则停止计时
             dreq = get_hash(str(op_msg))
@@ -980,9 +971,13 @@ class Node:
             message.append(op_msg[3])
             message.append(self.node_id)
             message.append(result)
+            sign_Mac = sign(str(message), self.client_list[op_msg[3]]["key"])
+            message.append(sign_Mac)
             communication.send(msg=message, **self.client_list[op_msg[3]])
             if self.request_have_receive.get(dreq) is not None:
                 self.request_have_receive.pop(dreq)
+            self.latest_reply[message_hash] = [op[0], message]
+            self.latest_reply[str(op_msg[3])] = [op[0], message]
 
             # 检查是否到达检查点
             if op[0] % self.checkpoint_base == 0:
@@ -1029,8 +1024,12 @@ class Node:
             s.bind((self.config["ip"], int(self.config["port"])))
             s.listen(10)
             while True:
+                msg = ""
                 c, addr = s.accept()
-                msg = c.recv(8192).decode()
+                message = c.recv(1024).decode()
+                while message != "":
+                    msg = msg + message
+                    message = c.recv(1024).decode()
                 c.close()
                 t = threading.Thread(target=self.chose_handler, args=(msg,))
                 t.start()
@@ -1072,7 +1071,7 @@ if __name__=='__main__':
     d_list["2"]["key"] = "cd"
     d_list["3"]["key"] = "dd"
 
-    client_list = {"2": {"ip": "127.0.0.1", "port": "60000"}}
+    client_list = {"2": {"ip": "127.0.0.1", "port": "60000", "key": "hehe"}}
     a = Node(node_id=0, node_list=a_list, client_list=client_list, timeout=10, checkpoint_base=3)
     b = Node(node_id=1, node_list=b_list, client_list=client_list, timeout=10, checkpoint_base=3)
     c = Node(node_id=2, node_list=c_list, client_list=client_list, timeout=10, checkpoint_base=3)

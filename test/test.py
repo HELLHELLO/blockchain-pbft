@@ -5,6 +5,12 @@ a.bind(("127.0.0.1", 60000))
 a.listen(10)
 while True:
     c, addr = a.accept()
-    d=c.recv(1024)
-    print(d.decode())
+    all_msg = ""
+    msg = c.recv(4).decode()
+    while msg != "":
+        print(msg)
+        all_msg = all_msg+msg
+        msg = c.recv(5)
+        msg = msg.decode()
     c.close()
+    print(all_msg)
