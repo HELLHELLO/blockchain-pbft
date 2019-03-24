@@ -4,24 +4,31 @@ import time
 
 a = socket.socket()
 a.connect(("127.0.0.1",30001))
-a.send(str([0, time.time(),0,"2","zero"]).encode())
+msg = [0, time.time(),0,"2","zero"]
+a.send(str(msg).encode())
 a.close()
+print(msg)
 
-time.sleep(1)
+#time.sleep(1)
 a = socket.socket()
 a.connect(("127.0.0.1",30002))
-a.send(str([0, time.time(),0,"2","zero"]).encode())
+#msg = [0, time.time(),0,"2","zero"]
+a.send(str(msg).encode())
 a.close()
+print(msg)
 
-time.sleep(1)
+#time.sleep(1)
 a = socket.socket()
 a.connect(("127.0.0.1",30003))
-a.send(str([0, time.time(),0,"2","zero"]).encode())
+#msg = [0, time.time(),0,"2","zero"]
+a.send(str(msg).encode())
 a.close()
+print(msg)
 
 
 ti=time.time()
-time.sleep(20)
+print(ti)
+time.sleep(60)
 a = socket.socket()
 a.connect(("127.0.0.1",30001))
 a.send(str([0, ti,0,"2","zero"]).encode())
