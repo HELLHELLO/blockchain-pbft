@@ -1,5 +1,6 @@
 import enum
 
+
 class Request(enum.Enum):
     empty = 0
     read = 1
@@ -15,3 +16,8 @@ class MessageHead(enum.Enum):
     checkpoint = 5
     view_change = 6
     new_view = 7
+
+
+class Authentication(enum.Enum):
+    register = 0
+    authenticate = 1
