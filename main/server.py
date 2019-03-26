@@ -40,7 +40,7 @@ class server:
             print("starting register")
         self.register()
         if self.test:
-            print("register successfully, cred location:",self.cred_location)
+            print("register successfully, cred location:", self.cred_location)
         s = socket.socket()
         ip = self.config["ip"]
         port = int(self.config["port"])
@@ -58,6 +58,7 @@ class server:
         message_hash = SHA256.new(str(self.cred).encode())
         signature = self.signer.sign(message_hash)
         self.cred.append(signature)
+        # cred格式为[name,timestamp,public_key,sign]
         self.cred_location = self.chain_client.execute_request(request_type=Request.write.value,
                                                                request_data=str(self.cred))
 
@@ -71,31 +72,59 @@ class server:
         elif request[0] is Authentication.authenticate.value:
             self.get_authenticate(data=request[1], c=c)
             return
+        elif request[0] is Authentication.req_for_PublicKey.value:
+            self.get_req_for_public_key(data=request[1], c=c)
+            return
         else:
             c.send("wrong message")
             c.close()
             return
 
+    # 该请求格式为[cred_location,server_name]
+    def get_req_for_public_key(self, data, c):
+        pass
+
+    def get_server_public_key(self, cred_location, server_name):
+        cred = self.chain_client.execute_request(request_data=cred_location, request_type=Request.read.value)
+        # 先检验服务器name是否正确
+        if cred[0] != server_name:
+            return False, None
+        # 检验该证书的签名正确与否
+        public_key_string = cred[2]
+        public_key = DSA.import_key(public_key_string)
+        pass
+
     # data为[username,userPublicKey]
     def get_register(self, data, c):
         timestamp = time.time()
         data.append(timestamp)
+        # 三个月的时间长度
+        life_time = 7776000
+        data.append(timestamp+life_time)
+        data.append(self.cred_location)
         # 签名，将信息写入链
+        # 写入链的证书格式为[username,userPublicKey,timestamp,cred_life,server_cred_location,sign1]
         message_hash = SHA256.new(str(data).encode())
         signature = self.signer.sign(message_hash)
         data.append(signature)
         cred_location = self.chain_client.execute_request(request_type=Request.write.value,
                                                           request_data=str(data))
         # 签名，将证书返回给用户
+        # 返回的证书格式为[username,userPublicKey,timestamp,cred_life,server_cred_location,cred_location,server_name,sign2]
         data[-1] = cred_location
+        data.append(self.name)
         message_hash = SHA256.new(str(data).encode())
         signature = self.signer.sign(message_hash)
         data.append(signature)
         c.send(str(data).encode())
         return
 
-    def get_authenticate(self,data,c):
-        pass
+    # 收到的authenticate请求格式为[cred_location]
+    def get_authenticate(self, data, c):
+        cred_location = data[0]
+        cred = self.chain_client.execute_request(request_type=Request.read.value, request_data=cred_location)
+        # 验证该证书的签名
+        # 首先获取
 
 
 

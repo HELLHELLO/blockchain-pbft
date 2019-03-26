@@ -185,7 +185,8 @@ class Client:
         timestamp = time.time()
         semaphore = threading.Semaphore(0)
         done_semaphore = threading.Semaphore(1)
-        self.task_list[str(timestamp)] = {"finish_semaphore": semaphore, "result": None, "done": False, "done_semaphore": done_semaphore}
+        self.task_list[str(timestamp)] = {"finish_semaphore": semaphore, "result": None, "done": False,
+                                          "done_semaphore": done_semaphore}
         self.send_request(timestamp=timestamp, request_data=request_data, request_type=request_type)
         semaphore.acquire()
         result = str(self.task_list[str(timestamp)]["result"])
