@@ -3,13 +3,14 @@ import socket
 import threading
 from Crypto.PublicKey import DSA
 from Crypto.Signature import DSS
+import Crypto.Random as Random
 from Crypto.Hash import SHA256
 import time
 from messgae_head import *
 
 
-class server:
-    def __init__(self, name="testServer", chain_client=None, config=None, domain=None, test=False):
+class Server:
+    def __init__(self, name="testServer", chain_client=None, config=None, domain=None, test=False, challenge_str_len=16):
         self.test = test
         #if chain_client is not None:
         #    self.chain_client = chain_client
@@ -33,6 +34,7 @@ class server:
         self.cred = []
         self.cred_location = None
         self.signer = DSS.new(key=self.key, mode="fips-186-3")
+        self.challenge_str_len = challenge_str_len
 
     def start(self):
         self.chain_client.start_client()
@@ -82,17 +84,31 @@ class server:
 
     # 该请求格式为[cred_location,server_name]
     def get_req_for_public_key(self, data, c):
-        pass
+        correct, public_tup = self.get_server_public_key(cred_location=data[0], server_name=data[1])
+        if correct is False:
+            c.send("wrong msg".encode())
+        else:
+            c.send(public_tup[1])
+        c.close()
+        return
 
-    def get_server_public_key(self, cred_location, server_name):
-        cred = self.chain_client.execute_request(request_data=cred_location, request_type=Request.read.value)
+    def get_server_public_key(self, cred_location, server_name=None):
+        cred = eval(self.chain_client.execute_request(request_data=cred_location, request_type=Request.read.value))
         # 先检验服务器name是否正确
-        if cred[0] != server_name:
+        if server_name is not None and cred[0] != server_name:
             return False, None
         # 检验该证书的签名正确与否
         public_key_string = cred[2]
         public_key = DSA.import_key(public_key_string)
-        pass
+        verifier = DSS.new(key=public_key, mode="fips-186-3")
+        sign = cred[-1]
+        cred = cred[:-1]
+        message_hash = SHA256.new(str(cred).encode())
+        try:
+            verifier.verify(msg_hash=message_hash, signature=sign)
+            return True, (public_key, public_key_string)
+        except ValueError:
+            return False, None
 
     # data为[username,userPublicKey]
     def get_register(self, data, c):
@@ -122,9 +138,54 @@ class server:
     # 收到的authenticate请求格式为[cred_location]
     def get_authenticate(self, data, c):
         cred_location = data[0]
-        cred = self.chain_client.execute_request(request_type=Request.read.value, request_data=cred_location)
+        # 取得链上的证书
+        cred = eval(self.chain_client.execute_request(request_type=Request.read.value, request_data=cred_location))
         # 验证该证书的签名
-        # 首先获取
+        # 首先获取为该证书签名的服务器的公钥
+        server_cred_location = cred[-2]
+        correct, publickey_tup = self.get_server_public_key(cred_location=server_cred_location)
+        if correct is False:
+            c.send("fail".encode())
+            c.close()
+            return
+        else:
+            public_key = publickey_tup[0]
+            # 验证该证书的签名是否正确
+            verifier = DSS.new(key=public_key, mode="fips-186-3")
+            sign = cred[-1]
+            cred = cred[:-1]
+            message_hash = SHA256.new(str(cred).encode())
+            try:
+                verifier.verify(msg_hash=message_hash, signature=sign)
+                # 证书签名正确，进入挑战应答阶段
+                self.challenge(verifier=verifier, c=c)
+                return
+            except ValueError:
+                c.send("fail".encode())
+                c.close()
+                return
+
+    def challenge(self, verifier, c):
+        # 发送挑战
+        challenge_str = Random.get_random_bytes(self.challenge_str_len)
+        message_hash = SHA256.new(challenge_str)
+        try:
+            c.send(challenge_str)
+            reply = c.recv(8192)
+            # reply直接为挑战字符串的签名
+            verifier.verify(msg_hash=message_hash, signature=reply)
+            c.send("success")
+            # 通过签名验证,进入下一阶段，生成登陆用令牌
+            self.generate_token(c=c, verifier=verifier)
+        except ValueError:
+            c.send("fail".encode())
+        except ConnectionError:
+            return
+
+    # 生成令牌
+    def generate_token(self, c, verifier):
+        c.recv(8192)
+        pass
 
 
 
