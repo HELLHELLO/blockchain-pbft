@@ -188,10 +188,12 @@ class Client:
         self.task_list[str(timestamp)] = {"finish_semaphore": semaphore, "result": None, "done": False,
                                           "done_semaphore": done_semaphore}
         self.send_request(timestamp=timestamp, request_data=request_data, request_type=request_type)
+        if self.test:
+            print("wait for result:",timestamp)
         semaphore.acquire()
-        result = str(self.task_list[str(timestamp)]["result"])
+        ex_result = str(self.task_list[str(timestamp)]["result"])
         self.task_list.pop(str(timestamp))
-        return result
+        return ex_result
 
     def start_client(self):
         receive_thread = threading.Thread(target=self.receive_reply)
@@ -206,5 +208,6 @@ if __name__ == "__main__":
     client_config = {"ip": "127.0.0.1", "port": "23333"}
     client = Client(node_list=a_list, client_config=client_config, client_id=2, node_sum=4, timeout=20, test=False)
     client.start_client()
-    result = client.execute_request(request_type=Request.read.value, request_data=(5,0))
+    result = client.execute_request(request_type=Request.write.value, request_data="11")
+    result = client.execute_request(request_type=Request.read.value, request_data=(1, 0))
     print(result)
