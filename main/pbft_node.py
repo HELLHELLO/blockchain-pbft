@@ -258,10 +258,8 @@ class Node:
                 self.seq_lock.release()
                 pre_prepare_msg = self.send_pre_prepare(request_msg=message, seq_number=seq, view=view)
                 # 将该预准备消息写入消息日志
-                pre_prepare_msg_dict = self.status_current["log"]["pre_prepare"]
-                pre_prepare_msg_dict[str([view, seq])] = pre_prepare_msg
                 if self.test == True:
-                    print("pre_prepare:",pre_prepare_msg_dict)
+                    print("pre_prepare:", pre_prepare_msg)
 
         else:
             if self.test == True:
@@ -301,6 +299,8 @@ class Node:
         message.append(msg_sign)
         message.append(request_msg)
         # 发送
+        pre_prepare_msg_dict = self.status_current["log"]["pre_prepare"]
+        pre_prepare_msg_dict[str([view, seq_number])] = message
         self.multicast(message, send_to_self=False)
         if self.test == True:
             print("sign=",message[-2])
