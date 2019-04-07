@@ -95,7 +95,7 @@ class Node:
     # C是稳定检查点的证明，P是P是一个包含了对于每一个i已准备的消息序号大于n的消息的Pm集合的集合。
     # Pm集合中包括一个有效的预准备消息（不包含对应的客户端信息），2f个对应的来自不同备份的有效的准备信息。
     # i是节点id
-    def change_view(self, view):
+    def change_view(self, view, request):
         # 启动定时器时的视图与当前视图不一致,或已经处于视图更改状态，不进行操作
         if view != self.status_current.get("view") or self.view_changing:
             return
@@ -105,6 +105,9 @@ class Node:
 
         # 定时器在当前视图中超时，执行视图更改
         self.view_changing = True
+        # 将触发超时的request在hash——receive中去掉
+        message_hash = get_hash(request)
+        self.request_have_receive.pop(message_hash)
         view_change_msg = self.generate_view_change(v=self.status_current["next_view"])
         # 发送
         self.multicast(view_change_msg)
@@ -273,7 +276,7 @@ class Node:
                 print("start timer from 1")
             if self.timer_state["timer"] is not None:
                 self.timer_state["timer"].cancel()
-            timer = threading.Timer(float(self.timeout), self.change_view, [view])
+            timer = threading.Timer(float(self.timeout), self.change_view, [view, message])
             self.timer_state["timer"] = timer
             timer.start()
             self.timer_state["dreq"] = message_hash
@@ -536,7 +539,7 @@ class Node:
             if i[2] != n:
                 continue
             num = 0
-            for j in checkpoint_msg_list:
+            for j in list(checkpoint_msg_list.keys()):
                 if checkpoint_msg_list[j][3] == i[0]:
                     num += 1
                 if self.test == True:
@@ -550,6 +553,8 @@ class Node:
                 checkpoint_proof = copy.deepcopy(checkpoint_msg_list)
                 stable_checkpoint = copy.deepcopy(i)
                 self.status_stable_checkpoint = {"checkpoint": stable_checkpoint, "proof": checkpoint_proof}
+                if self.test == True:
+                    print("stable_checkpoint:", self.status_stable_checkpoint["checkpoint"][2])
                 checkpoint_to_del.append(i)
                 # 删除所有更早的检查点状态
                 for checkpoint in self.status_checkpoint:
@@ -559,8 +564,14 @@ class Node:
                 pre_prepare_list = self.status_current.get("log").get("pre_prepare")
                 keys = list(pre_prepare_list.keys())
                 for msg in keys:
-                    if pre_prepare_list[msg][2] <= i[2]:
-                        pre_prepare_list.pop(msg)
+                    try:
+                        if eval(msg)[-1] == "done":
+                            continue
+                        if pre_prepare_list[msg][2] <= n:
+                            pre_prepare_list.pop(msg)
+                    except KeyError:
+                        print("keyerror:", pre_prepare_list)
+                        raise KeyError
 
                 prepare_list = self.status_current.get("log").get("prepare")
                 keys = list(prepare_list.keys())
@@ -739,7 +750,7 @@ class Node:
     def ask_for_checkpoint(self, node_id):
         node_config = self.node_list[str(node_id)]
         host = node_config["ip"]
-        port = node_config["port_push"]
+        port = int(node_config["port_push"])
         s = socket.socket()
         s.connect((host, port))
         checkpoint = eval(s.recv(4096).decode())
@@ -841,13 +852,16 @@ class Node:
                 self.status_current["op_to_execute"] = []
                 self.latest_reply = {}
             # 删除所有更早的检查点状态
-            for checkpoint in self.status_checkpoint:
-                if checkpoint[2] <= min_s:
-                    checkpoint_list.remove(checkpoint)
+                # 不删除了，等下次检查点再删
+            #for checkpoint in self.status_checkpoint:
+            #    if checkpoint[2] <= min_s:
+            #        checkpoint_list.remove(checkpoint)
             # 删除所有序号小于等于检查点的预准备，准备，提交消息
                 pre_prepare_list = self.status_current.get("log").get("pre_prepare")
                 keys = list(pre_prepare_list.keys())
                 for msg in keys:
+                    if eval(msg)[-1] == "done":
+                        continue
                     if pre_prepare_list[msg][2] <= min_s:
                         pre_prepare_list.pop(msg)
 
@@ -970,17 +984,26 @@ class Node:
 
         # 检查O是否正确
         O, min_s, msg_i, max_s = self.generate_O(V, v)
+        for i in range(len(O)):
+            O[i][4] = message[3][i][4]
         if str(O) != str(message[3]):
             if self.test == True:
                 print("wrong O")
+                print(O)
+                print(message[3])
             return
         self.write_to_log(message=message, msg_type="new_view", v=v, n=min_s, i=p)
         if self.test == True:
             print("receive value new view from", p)
         # 通过检测，将O中消息写入日志
+        if self.test == True:
+            print("O is :", O)
+            print("pre_prepare is :",self.status_current["log"]["pre_prepare"])
         for msg in O:
-            self.write_to_log(msg, "pre_prepare")
-
+            # self.write_to_log(msg, "pre_prepare")
+            self.status_current["log"]["pre_prepare"][str([msg[1], msg[2]])] = msg
+        if self.test == True:
+            print(self.status_current["log"]["pre_prepare"])
         self.update_checkpoint(V=V, msg_i=msg_i, min_s=min_s)
         # 更新序号有效范围
         self.seq_lock.acquire()
