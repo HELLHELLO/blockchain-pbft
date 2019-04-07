@@ -13,3 +13,10 @@ def sign(string, key):
     string = str(string)
     key = str(key)
     return hashlib.sha1((string+key).encode()).hexdigest()
+
+
+def randombytes(hlen):
+    a = b''
+    for i in range(hlen):
+        a = a + b'1'
+    return a

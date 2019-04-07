@@ -22,3 +22,4 @@ class Authentication(enum.Enum):
     register = 0
     authenticate = 1
     req_for_PublicKey = 2
+    login = 3
