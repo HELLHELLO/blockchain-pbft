@@ -189,7 +189,7 @@ class Client:
                                           "done_semaphore": done_semaphore}
         self.send_request(timestamp=timestamp, request_data=request_data, request_type=request_type)
         if self.test:
-            print("wait for result:",timestamp)
+            print("wait for result:", timestamp)
         semaphore.acquire()
         ex_result = str(self.task_list[str(timestamp)]["result"])
         self.task_list.pop(str(timestamp))

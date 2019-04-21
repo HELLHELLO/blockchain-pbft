@@ -11,7 +11,7 @@ import time
 from messgae_head import *
 from Crypto.Cipher import PKCS1_OAEP
 from crypto_algorithm import *
-
+import hashlib
 
 class Server:
     def __init__(self, name="testServer", chain_client=None, config=None, domain=None, test=False, challenge_str_len=16,
@@ -176,28 +176,33 @@ class Server:
             try:
                 verifier.verify(msg_hash=message_hash, signature=sign)
                 user_publickey = DSA.import_key(cred[1])
-                verifier_for_user = DSS.new(rsa_key=user_publickey)
+                # verifier_for_user = DSS.new(rsa_key=user_publickey)
                 # 证书签名正确，进入挑战应答阶段
-                self.challenge(verifier=verifier_for_user, c=c, cred_location=cred_location)
+                self.challenge(user_pubkey=user_publickey, c=c, cred_location=cred_location)
                 return
             except ValueError:
                 c.send("fail".encode())
                 c.close()
                 return
 
-    def challenge(self, verifier, c, cred_location):
+    def challenge(self, user_pubkey, c, cred_location):
         if self.test:
             print("challenging")
         # 发送挑战
         challenge_str = Random.get_random_bytes(self.challenge_str_len)
-        message_hash = SHA256.new(challenge_str)
+        # message_hash = SHA256.new(challenge_str)
+        cipher = PKCS1_OAEP.new(user_pubkey, randfunc=randombytes)
+        encrypt_challenge = cipher.encrypt(challenge_str)
         try:
-            c.send(challenge_str)
+            c.send(encrypt_challenge)
             reply = c.recv(8192)
-            # reply直接为挑战字符串的签名
-            verifier.verify(msg_hash=message_hash, signature=reply)
+            # reply直接为挑战字符串
+            # verifier.verify(msg_hash=message_hash, signature=reply)
+            if reply != challenge_str:
+                raise ValueError
             c.send("success".encode())
             # 通过签名验证,进入下一阶段，生成登陆用令牌
+            verifier = DSS.new(rsa_key=user_pubkey)
             self.generate_token(c=c, verifier=verifier, challenge_str=challenge_str, reply=reply,
                                 cred_location=cred_location)
             return
@@ -208,7 +213,7 @@ class Server:
         except ConnectionError:
             return
 
-    # 生成令牌,用户发送的是[Epku(k1,server1),Epku(k2,server2),Epku(k3,server3)...,sign],最多不超过10个key
+    # 生成令牌,用户发送的是[h(k1,server1),h(k2,server2),h(k3,server3)...,sign],最多不超过10个key
     def generate_token(self, c, verifier, challenge_str, reply, cred_location):
         message = c.recv(8192).decode()
         message = eval(message)
@@ -220,8 +225,8 @@ class Server:
             verifier.verify(msg_hash=message_hash, signature=sign)
             timestamp = time.time()
             # 验证签名正确，生成令牌
-            # 令牌格式为[cred_location,server_cred_location,challenge_str,reply,[Epku(k1,server1),Epku(k2,server2),Epku(k3,server3)...,sign],timestamp,token_life,sign]
-            token = [cred_location, self.cred_location, challenge_str, reply, message, timestamp, timestamp+self.token_life]
+            # 令牌格式为[cred_location,server_cred_location,[h(k1,server1),h(k2,server2),h(k3,server3)...,timestamp,sign],token_life,sign]
+            token = [cred_location, self.cred_location, message, timestamp+self.token_life]
             message_hash = SHA256.new(str(token).encode())
             sign = self.signer.sign(message_hash)
             token.append(sign)
@@ -256,6 +261,11 @@ class Server:
             token_hash = SHA256.new(str(token[:-1]).encode())
             verifier = DSS.new(rsa_key=server_publickey)
             try:
+                keys = token[2]
+                # 验证token是否有效
+                t = time.time()
+                if time.time() >= token[-2] or t - keys[-2] >= self.token_life:
+                    raise ValueError
                 # 验证token的签名
                 verifier.verify(msg_hash=token_hash, signature=token[-1])
                 if self.test:
@@ -266,7 +276,6 @@ class Server:
                 user_public_key_string = cred[1]
                 user_public_key = DSA.import_key(user_public_key_string)
                 verifier = DSS.new(rsa_key=user_public_key)
-                keys = token[4]
                 if self.test:
                     print(keys)
                     print(user_public_key_string)
@@ -277,8 +286,10 @@ class Server:
                 # 验证通过后，检验收到的密钥是否是token中的密钥
                 cipher_for_server = PKCS1_OAEP.new(self.key)
                 session_key = cipher_for_server.decrypt(data[1])
-                cipher_for_user = PKCS1_OAEP.new(user_public_key, randfunc=randombytes)
-                session_key_encryptd = cipher_for_user.encrypt(session_key)
+                # cipher_for_user = PKCS1_OAEP.new(user_public_key, randfunc=randombytes)
+
+                # session_key_encryptd = cipher_for_user.encrypt(session_key)
+                session_key_hashed = hashlib.sha1(session_key).hexdigest()
                 i = data[2]
                 session_key_received = keys[i]
                 session_key_list = eval(session_key.decode())
@@ -286,9 +297,9 @@ class Server:
                 server_name = session_key_list[1]
                 if self.test:
                     print(server_name)
-                    print(session_key_encryptd == session_key_received)
+                    print(session_key_hashed == session_key_received)
                     print(server_name == self.name)
-                if session_key_encryptd == session_key_received and server_name == self.name:
+                if session_key_hashed == session_key_received and server_name == self.name:
                     reply = "session key is "+session_key
                     c.send(reply.encode())
                 else:
