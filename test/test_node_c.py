@@ -27,7 +27,9 @@ if __name__ == '__main__':
     d_list["2"]["key"] = "cd"
     d_list["3"]["key"] = "dd"
 
-    client_list = {"2": {"ip": "127.0.0.1", "port": "23333", "key": "hehe"}}
+    client_list = {"2": {"ip": "127.0.0.1", "port": "23333", "key": "hehe"},
+                   "3": {"ip": "127.0.0.1", "port": "23334", "key": "hehe"}}
+
     a = Node(node_id=0, node_list=a_list, client_list=client_list, timeout=10, checkpoint_base=3,test=True)
     b = Node(node_id=1, node_list=b_list, client_list=client_list, timeout=10, checkpoint_base=3,test=True)
     c = Node(node_id=2, node_list=c_list, client_list=client_list, timeout=10, checkpoint_base=3,test=True)

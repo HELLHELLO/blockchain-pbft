@@ -170,10 +170,15 @@ class Node:
     def multicast(self, message, send_to_self=True):
         for i in self.node_list:
             if i != str(self.node_id):
-                communication.send(msg=message, **self.node_list[i])
+                threading.Thread(target=communication.send, args=(self.node_list[i]["ip"], self.node_list[i]["port"],
+                                                                  message)).start()
+                #communication.send(msg=message, **self.node_list[i])
         # 是否发送给自身
         if send_to_self:
-            communication.send(msg=message, **self.node_list[str(self.node_id)])
+            threading.Thread(target=communication.send, args=(self.node_list[str(self.node_id)]["ip"],
+                                                              self.node_list[str(self.node_id)]["port"],
+                                                              message)).start()
+            #communication.send(msg=message, **self.node_list[str(self.node_id)])
 
     def chose_handler(self, msg):
         message = eval(msg)
@@ -1163,7 +1168,7 @@ if __name__=='__main__':
     d_list["2"]["key"] = "cd"
     d_list["3"]["key"] = "dd"
 
-    client_list = {"2": {"ip": "127.0.0.1", "port": "23333", "key": "hehe"}}
+    client_list = {"2": {"ip": "127.0.0.1", "port": "23333", "key": "hehe"},"3": {"ip": "127.0.0.1", "port": "23334", "key": "hehe"}}
     a = Node(node_id=0, node_list=a_list, client_list=client_list, timeout=10, checkpoint_base=3)
     b = Node(node_id=1, node_list=b_list, client_list=client_list, timeout=10, checkpoint_base=3)
     c = Node(node_id=2, node_list=c_list, client_list=client_list, timeout=10, checkpoint_base=3)

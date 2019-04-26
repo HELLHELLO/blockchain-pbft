@@ -17,17 +17,17 @@ class Server:
     def __init__(self, name="testServer", chain_client=None, config=None, domain=None, test=False, challenge_str_len=16,
                  life_time=7776000, token_life=1800):
         self.test = test
-        #if chain_client is not None:
-        #    self.chain_client = chain_client
-        #else:
-        a_to_b = {"ip": "127.0.0.1", "port": "30001", "id": 1, "key": "hehe"}
-        a_to_c = {"ip": "127.0.0.1", "port": "30002", "id": 2, "key": "hehe"}
-        a_to_d = {"ip": "127.0.0.1", "port": "30003", "id": 3, "key": "hehe"}
-        a_to_a = {"ip": "127.0.0.1", "port": "30000", "id": 0, "key": "hehe"}
-        a_list = {"0": a_to_a, "1": a_to_b, "2": a_to_c, "3": a_to_d}
-        client_config = {"ip": "127.0.0.1", "port": "23333"}
-        self.chain_client = Client(node_list=a_list, client_config=client_config, client_id=2, node_sum=4,
-                                   timeout=20, test=True)
+        if chain_client is not None:
+            self.chain_client = chain_client
+        else:
+            a_to_b = {"ip": "127.0.0.1", "port": "30001", "id": 1, "key": "hehe"}
+            a_to_c = {"ip": "127.0.0.1", "port": "30002", "id": 2, "key": "hehe"}
+            a_to_d = {"ip": "127.0.0.1", "port": "30003", "id": 3, "key": "hehe"}
+            a_to_a = {"ip": "127.0.0.1", "port": "30000", "id": 0, "key": "hehe"}
+            a_list = {"0": a_to_a, "1": a_to_b, "2": a_to_c, "3": a_to_d}
+            client_config = {"ip": "127.0.0.1", "port": "23333"}
+            self.chain_client = Client(node_list=a_list, client_config=client_config, client_id=2, node_sum=4,
+                                       timeout=20, test=True)
         self.config = config
         self.name = name
         if domain is None:
@@ -48,7 +48,7 @@ class Server:
         if self.test:
             print("starting register")
         self.register()
-        if self.test:
+        if not self.test:
             print("register successfully, cred location:", self.cred_location)
         s = socket.socket()
         ip = self.config["ip"]
@@ -230,6 +230,8 @@ class Server:
             message_hash = SHA256.new(str(token).encode())
             sign = self.signer.sign(message_hash)
             token.append(sign)
+            if not self.test:
+                print("token",token)
             token_location = eval(self.chain_client.execute_request(request_type=Request.write.value,
                                                                     request_data=str(token)))
             c.send(str(token_location).encode())
@@ -310,6 +312,7 @@ class Server:
                 return
 
 
-a = Server(config={"ip": "127.0.0.1", "port": "56666"},test=True)
-a.start()
-print("hello")
+if __name__ == "__main__":
+    a = Server(config={"ip": "127.0.0.1", "port": "56666"},test=True)
+    a.start()
+    print("hello")
