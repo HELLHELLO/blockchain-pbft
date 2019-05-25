@@ -435,7 +435,6 @@ class Node:
             print("receive commit from", message[4])
         if self.check_message(message) is False:
             return
-
         # 通过检查后，接收消息并写入日志
         self.write_to_log(message, "commit")
 
@@ -448,11 +447,13 @@ class Node:
         have_committed = self.status_current.get("log").get("commit")[(str([v, n, "done"]))]
         if have_committed is True:
             return
+
         # 检查是否收到2f+1个不同节点的匹配提交信息
         pre_prepare_log_for_message = self.status_current.get("log").get("pre_prepare").get(str([v, n]))
         commit_log_for_v_n = self.status_current.get("log").get("commit").get(str([v, n]))
         if pre_prepare_log_for_message is None:
             return
+
 
         commit_local = 0
         for msg in commit_log_for_v_n:
@@ -466,6 +467,9 @@ class Node:
             if pre_prepare_log_for_message[5] is not "":
                 heappush(self.status_current.get("op_to_execute"), (n, pre_prepare_log_for_message[5]))
                 self.execute_semaphore.release()
+
+
+
 
     def check_message(self, message):
         # 检查
@@ -537,8 +541,11 @@ class Node:
             if self.test == True:
                 print("receive checkpoint from", message[4])
 
-        # 检查是否以完成正确性证明
+        # 检查是否完成正确性证明
         checkpoint_msg_list = self.status_current.get("log").get("checkpoint").get(str([v, n]))
+
+
+
         checkpoint_to_del = []
         for i in self.status_checkpoint:
             if i[2] != n:
@@ -758,7 +765,12 @@ class Node:
         port = int(node_config["port_push"])
         s = socket.socket()
         s.connect((host, port))
-        checkpoint = eval(s.recv(4096).decode())
+        checkpoint_str = ""
+        checkpoint_str_msg = s.recv(1024).decode()
+        while checkpoint_str_msg != "":
+            checkpoint_str = checkpoint_str + checkpoint_str_msg
+            checkpoint_str_msg = s.recv(1024).decode()
+        checkpoint = eval(checkpoint_str)
         s.close()
         return checkpoint
 
@@ -1025,12 +1037,15 @@ class Node:
         # 为O中的每一条信息发送相应的prepare
         for pre_prepare in O:
             self.send_prepare_or_commit(v=v, n=pre_prepare[2], d=pre_prepare[3], i=self.node_id, msg_type="prepare")
+
+        self.request_have_receive = {}
         
         
     def execute_op(self):
         op_list = self.status_current.get("op_to_execute")
         while True:
             self.execute_semaphore.acquire()
+
             if self.node_id == 0:
                 pass
                 #print(str(self.status_current["log"]))

@@ -186,24 +186,24 @@ class Server:
                 return
 
     def challenge(self, user_pubkey, c, cred_location):
-        if self.test:
-            print("challenging")
+        #if self.test:
+        #    print("challenging")
         # 发送挑战
-        challenge_str = Random.get_random_bytes(self.challenge_str_len)
+        #challenge_str = Random.get_random_bytes(self.challenge_str_len)
         # message_hash = SHA256.new(challenge_str)
-        cipher = PKCS1_OAEP.new(user_pubkey, randfunc=randombytes)
-        encrypt_challenge = cipher.encrypt(challenge_str)
+        #cipher = PKCS1_OAEP.new(user_pubkey, randfunc=randombytes)
+        #encrypt_challenge = cipher.encrypt(challenge_str)
         try:
-            c.send(encrypt_challenge)
-            reply = c.recv(8192)
+            #c.send(encrypt_challenge)
+            #reply = c.recv(8192)
             # reply直接为挑战字符串
             # verifier.verify(msg_hash=message_hash, signature=reply)
-            if reply != challenge_str:
-                raise ValueError
+            #if reply != challenge_str:
+            #    raise ValueError
             c.send("success".encode())
             # 通过签名验证,进入下一阶段，生成登陆用令牌
             verifier = DSS.new(rsa_key=user_pubkey)
-            self.generate_token(c=c, verifier=verifier, challenge_str=challenge_str, reply=reply,
+            self.generate_token(c=c, verifier=verifier,
                                 cred_location=cred_location)
             return
         except ValueError:
@@ -214,7 +214,7 @@ class Server:
             return
 
     # 生成令牌,用户发送的是[h(k1,server1),h(k2,server2),h(k3,server3)...,sign],最多不超过10个key
-    def generate_token(self, c, verifier, challenge_str, reply, cred_location):
+    def generate_token(self, c, verifier, cred_location):
         message = c.recv(8192).decode()
         message = eval(message)
         keys = message[:-1]

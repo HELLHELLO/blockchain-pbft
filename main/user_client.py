@@ -29,8 +29,12 @@ print(len(reply))
 cred = eval(reply)
 server_cred_location = cred[1]
 # 获取服务器公钥
-server_name = "testB"
-req_for_public_key = [(1,1), server_name]
+server_name =str(input("server_name:"))
+    #"testB"
+    #input("server_name:")
+location=eval(input("server_location:"))
+port=eval(input("server_port:"))
+req_for_public_key = [location, server_name]
 req_for_public_key_msg = [Authentication.req_for_PublicKey.value, req_for_public_key]
 c = socket.socket()
 c.connect(("127.0.0.1", 56666))
@@ -39,25 +43,26 @@ server_public_key_str = c.recv(8192)
 server_public_key = RSA.importKey(server_public_key_str)
 # 认证
 cred_location = cred[2]
-print("认证开始：",time.time())
+print("令牌生成准备开始：",time.time())
 authenticate_data = [cred_location]
 authenticate_msg = [Authentication.authenticate.value, authenticate_data]
 s = socket.socket()
 s.connect(("127.0.0.1", 56666))
 s.send(str(authenticate_msg).encode())
-challenge = s.recv(1024)
-print("挑战：",challenge)
+#challenge = s.recv(1024)
+#print("挑战：",challenge)
 # message_hash = SHA256.new(challenge)
-decrypr = PKCS1_OAEP.new(client_key, randfunc=randombytes)
-sign = decrypr.decrypt(challenge)
-s.send(sign)
+#decrypr = PKCS1_OAEP.new(client_key, randfunc=randombytes)
+#sign = decrypr.decrypt(challenge)
+#s.send(sign)
 challenge_result = s.recv(1024).decode()
 print(challenge_result)
-print("认证结束：",time.time())
+print("令牌生成准备结束：",time.time())
 # 生成会话密钥
 print("令牌生成开始：",time.time())
 session_key = str(("test", server_name))
-session_key2 = str(("testb", "testB"))
+#session_key2 = str(("testb", "testB"))
+session_key2 = str(("testb", server_name))
 # cipher = PKCS1_OAEP.new(client_public_key, randfunc=randombytes)
 encrypt_session_key = hashlib.sha1(session_key.encode()).hexdigest()#cipher.encrypt(session_key.encode())
 encrypt_session_key2 = hashlib.sha1(session_key2.encode()).hexdigest()
@@ -80,7 +85,7 @@ encrypt_session_key = cipher_server.encrypt(session_key2.encode())
 login_message = [token_location, encrypt_session_key, 1]
 login_req = [Authentication.login.value, login_message]
 s = socket.socket()
-s.connect(("127.0.0.1", 56667))
+s.connect(("127.0.0.1", port))
 s.send(str(login_req).encode())
 reply = s.recv(1024).decode()
 print("登录结束：",time.time())
