@@ -3,11 +3,11 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 font = FontProperties(fname=r"C:\Windows\Fonts\simhei.ttf", size=14)
 
-plt.bar([0.8,1.8,2.8,3.8], [2.10, 1.70, 1.50, 3.89], label='three nodes',width=0.4)
+plt.bar([0.8,2.8,4.8,6.8], [2.10, 1.70, 1.50, 3.89], label='three nodes',width=0.4)
 
-plt.bar([1.2,2.2,3.2,4.2], [2.39, 2.39, 1.80, 4.39], label='four nodes',width=0.4)
-plt.xticks([1,2,3,4],["注册","令牌生成准备","令牌生成","登录"],FontProperties=font)
-x=[0.8,1.8,2.8,3.8,1.2,2.2,3.2,4.2]
+plt.bar([1.2,3.2,5.2,7.2], [2.39, 2.39, 1.80, 4.39], label='four nodes',width=0.4)
+plt.xticks([1,3,5,7],["registration","token\ngeneration\npreparation","token generation","login"],FontProperties=font)
+x=[0.8,2.8,4.8,6.8,1.2,3.2,5.2,7.2]
 y=[2.10, 1.70, 1.50, 3.89,2.39, 2.39, 1.80, 4.39]
 plt.ylim(0,5)
 for a,b in zip(x,y):
@@ -22,9 +22,9 @@ for a,b in zip(x,y):
 
 plt.legend()
 
-plt.xlabel('阶段', FontProperties=font)
-plt.ylabel('所用时间(ms)', FontProperties=font)
+plt.xlabel('phase', FontProperties=font)
+plt.ylabel('time(ms)', FontProperties=font)
 
-plt.title(u'各阶段所用时间', FontProperties=font)
+#plt.title(u'Time spent in each stage', FontProperties=font)
 
 plt.show()

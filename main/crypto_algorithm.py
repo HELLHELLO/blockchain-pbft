@@ -5,7 +5,7 @@ import hmac
 # 暂定
 def get_hash(string):
     string = str(string)
-    return hashlib.sha1(string.encode()).hexdigest()
+    return hashlib.sha256(string.encode()).hexdigest()
 
 
 # 计算签名
@@ -13,7 +13,7 @@ def get_hash(string):
 def sign(string, key):
     string = str(string).encode()
     key = str(key).encode()
-    return hmac.new(key=key, msg=string, digestmod=hashlib.sha1).hexdigest()
+    return hmac.new(key=key, msg=string, digestmod=hashlib.sha256).hexdigest()
     # return hashlib.sha1((string+key).encode()).hexdigest()
 
 
